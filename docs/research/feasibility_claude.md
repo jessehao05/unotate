@@ -1,7 +1,7 @@
 # Feasibility Notes
 
 Consolidated notes from architecture/feasibility discussion. Picks up from
-[brainstorming.md](../brainstorming.md).
+[overview.md](../overview.md).
 
 ## Is Python required?
 
