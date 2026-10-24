@@ -1,7 +1,9 @@
 # This Branch: Solo Piano
 
+`solo/local`
+
 Scope:
-- transcription for only solo piano (1 hand)
+- transcription for only solo piano (1 person)
 
 Files:
 - [overview.md](../overview.md): original project brief (goal, stack ideas, scope)
