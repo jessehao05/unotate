@@ -3,6 +3,12 @@
 Consolidated notes from architecture/feasibility discussion. Picks up from
 [overview.md](../overview.md).
 
+> **Status (`solo/local` branch):** the overview now fixes scope to a
+> **local CLI** (`unotate transcribe <url-or-file> -o out.musicxml`), **solo
+> piano only**, **MusicXML output**. No web frontend, no hosted deployment,
+> no 4-hand duets. Sections below are updated to match; earlier versions
+> are in git history.
+
 ## Is Python required?
 
 Not for the whole pipeline, but effectively yes for one stage:
@@ -20,32 +26,33 @@ legible. Python has `music21` + `librosa`/`madmom` for this. JS/TS has parsers
 (`@tonejs/midi`) and renderers (OpenSheetMusicDisplay, VexFlow) but nothing
 that does the musical analysis in between — you'd be writing that yourself.
 
-**Conclusion:** Python backend, but because of `music21`, not because of `torch`.
+**Conclusion:** Python, because of `music21`, not because of `torch`. With
+the CLI-only scope there's no frontend, so the whole project can be Python.
 
-## Deployment risks in the original plan
+## Running locally (replaces "Deployment risks")
 
-1. **yt-dlp from a datacenter IP.** YouTube blocks/throttles cloud provider
-   IP ranges (Render, Fly, Railway, etc.). Works in local dev, breaks in prod
-   intermittently. Given personal-use scope: make file upload the primary
-   path, treat URL input as best-effort.
-2. **Render free tier is the wrong shape.** ~512MB RAM, spins down after
-   idle (verify current limits). PyTorch + checkpoint likely won't fit
-   comfortably; cold start + CPU inference could mean minutes for first
-   request. Better free options: Hugging Face Spaces (generous CPU tier,
-   built for this) or Modal (serverless, real GPUs, monthly free credit).
-3. **Sync request/response won't hold** for multi-minute jobs. Use
-   `POST /jobs` → `202 {job_id}` → poll `GET /jobs/{id}` instead of a long
-   held HTTP request.
+The earlier hosting risks (Render's free-tier limits, YouTube blocking
+datacenter IPs, needing an async job API for multi-minute requests) no
+longer apply: everything runs on the user's machine.
+
+What's left:
+
+- **yt-dlp still breaks periodically** when YouTube changes its site, even
+  from a home IP. Keep it updated (or unpinned), and keep local file input
+  as the reliable path.
+- **Long runs are fine** for a CLI, but print stage progress so a
+  multi-minute transcription doesn't look hung.
 
 ## Output format
 
 Prefer **MusicXML** over `.mscz` (MuseScore's native format is
 version-coupled/tool-specific; MusicXML opens everywhere — MuseScore,
-Dorico, Sibelius, Finale, Flat.io). Always also hand back the raw **MIDI**
-alongside it — free to produce, and it's the fallback when notation comes
-out wrong. Skip PNG except as an in-browser preview.
+Dorico, Sibelius, Finale, Flat.io). If an `.mscz` is wanted, convert the
+MusicXML with the MuseScore CLI rather than generating it directly. Always
+also write the raw **MIDI** alongside it — free to produce, and it's the
+fallback when notation comes out wrong. No PNG output.
 
-## Repertoire-specific difficulty (Liszt Liebesträume No. 3 solo; BELLA&LUCAS-style 4-hand duets)
+## Repertoire-specific difficulty (Liszt Liebesträume No. 3, solo)
 
 Note *detection* is the easy part — modern piano AMT is strong on
 Romantic-era solo repertoire (in-domain for MAESTRO-trained models).
@@ -65,21 +72,14 @@ Notation is where it breaks, for three specific reasons:
 - **Pedal.** Heavy sustain makes note *offsets* genuinely ambiguous, not
   just hard to detect — directly affects duration/tie correctness.
 
-**Model choice:** use the ByteDance high-resolution piano transcription
-model (Kong et al., "High-resolution Piano Transcription with Pedals by
-Regressing Onsets and Offsets Times") over Basic Pitch — it's trained on
-MAESTRO (close to this repertoire) and predicts sustain pedal explicitly,
-addressing the offset-ambiguity problem. Check whether a transformer
-successor (e.g. hFT-Transformer) has since overtaken it on MAESTRO
-benchmarks.
+**Model choice:** superseded by [models.md](models.md) (checked
+2026-10-01). Short version: Transkun or the ByteDance/Kong model for audio →
+MIDI (both predict sustain pedal, which addresses the offset-ambiguity
+problem), PM2S for MIDI → score, and the Penner & Hindle pipeline (Kong →
+hand separation → PM2S → MusicXML) as a reference implementation. Also try
+Aria-AMT on lower-quality YouTube audio.
 
-**4-hand duets:** which player played which note is **not acoustically
-recoverable** from a single mixdown — not a model-quality problem, the
-information isn't in the signal (Primo/Secondo overlap in register
-constantly). Target a **condensed 2-stave score** of everything sounding;
-treat Primo/Secondo splitting as manual work in MuseScore. Also expect
-graceful-not-total degradation from 10–16 simultaneous notes vs. MAESTRO's
-solo-piano distribution.
+**4-hand duets:** out of scope on this branch.
 
 ## University GPU cluster
 
@@ -88,25 +88,24 @@ solo-piano distribution.
 - **Doesn't help:** the notation stage (quantization, key detection, staff
   assignment, MusicXML generation) — that's symbolic CPU work, and it's
   where the actual quality problem lives.
-- **Can't do:** host the backend. Clusters are SLURM batch schedulers (job
-  + queue, not a persistent HTTP endpoint), typically VPN-gated, and running
-  a public web service on institutional research compute is likely against
-  acceptable-use policy.
 
-Net effect: reinforces building the core as a plain Python **library + CLI**
-first (device/model selection behind config), so the same code runs locally
-for iteration and on the cluster for batch jobs, with a web layer as an
-optional later wrapper.
+Net effect: build the core as a plain Python **library + CLI** (device/model
+selection behind config), so the same code runs locally for iteration and
+on the cluster for batch evaluation jobs.
 
 ## Evaluation strategy (free ground truth)
 
-Liebesträume is public domain (1850) — clean engravings exist on IMSLP.
-Splits the two example pieces into distinct roles:
+Liebesträume is public domain (1850) — clean engravings exist on IMSLP, as
+do scores for the other example pieces (Chopin nocturnes, Beethoven
+sonatas). Any of them can serve as an evaluation set with an objective
+accuracy measurement.
 
-- **Liszt = evaluation set.** A score already exists, so transcribing it has
-  no product value, but it gives an objective accuracy measurement.
-- **4-hand arrangements = the actual product.** No published score — that's
-  why the tool is worth building.
+With duets dropped, the evaluation pieces and the pieces the tool is
+actually used on are now the same kind of music. The earlier split
+("Liszt = evaluation, 4-hand arrangements = product, since they have no
+published score") no longer holds. The tool's main use is now solo YouTube
+covers with no published score, so the classical pieces become proxy
+evaluation sets (see "Resolved questions" below).
 
 Two evaluation levels (verify current state/APIs of both before relying on
 them):
@@ -122,14 +121,14 @@ MIT-licensed, close analogue of this project. Key findings from reading the
 repo (as of this research; verify current state before relying on details):
 
 - **Stack:** FastAPI + Celery + Redis backend; React + VexFlow (notation
-  rendering) + Tone.js (playback) + Zustand frontend. Deployed on HF Spaces
-  (backend) + Vercel (frontend) — validates that combination independently.
+  rendering) + Tone.js (playback) + Zustand frontend, hosted on HF Spaces +
+  Vercel. Not relevant to unotate's CLI-only scope.
 - **ML pipeline:** BS-RoFormer + Demucs for source separation; YourMT3+
   ensembled with ByteDance piano transcription + BiLSTM refinement for
   transcription. Claims 96.1% F1 on MAESTRO test set — but this is
   note-level onset F1 on studio solo-piano recordings; says nothing about
-  notation readability or performance on compressed YouTube rips of 4-hand
-  arrangements. Don't let the headline number reset expectations.
+  notation readability or performance on compressed YouTube rips. Don't let
+  the headline number reset expectations.
 - **Notation stage was abandoned.** Roadmap: Phase 1 (done) = transcription,
   separation, interactive editor, **MIDI export**. Phase 2 (not started) =
   multi-instrument, **grand staff**, **PDF export**. Code comment in
@@ -164,7 +163,7 @@ repo (as of this research; verify current state before relying on details):
 - **Skip:** source separation (BS-RoFormer/Demucs) — not needed since scope
   is piano-only, no other instruments. Their own docs cost this at 8-15 min
   on CPU; it's the slowest stage and a source of bleed artifacts. Also skip
-  multi-instrument support, the collaborative editor, and account plumbing.
+  multi-instrument support, the web frontend/editor, and account plumbing.
 - **Borrow (deliberately, not a fork):** the YourMT3+ / ByteDance ensemble
   model choice; their beat-synchronous quantization approach
   (`pipeline.py` `beat_synchronous_quantize`); their sustain-artifact /
@@ -191,20 +190,20 @@ separately is the difference between a tractable project and guessing.
 
 ```
 unotate/
-  core/          Python library, no web deps
-    ingest       yt-dlp / file upload → ffmpeg → normalized wav
-    transcribe   ByteDance model (device: cpu|cuda) → MIDI + pedal
+  core/          Python library
+    ingest       yt-dlp (URL) / local file → ffmpeg → normalized wav
+    transcribe   Transkun or Kong (device: cpu|cuda) → MIDI + pedal
     rhythm       beat/tempo estimation → quantization  ← hardest stage
     engrave      key detect, hand split, music21 → MusicXML
-  cli/           unotate transcribe <input> -o out.musicxml
+  cli/           unotate transcribe <url-or-file> -o out.musicxml
   eval/          mir_eval + MV2H against IMSLP/MAESTRO ground truth
-  web/           added last, thin FastAPI wrapper (HF Spaces)
 ```
 
 Design calls favored given the repertoire:
 
-- **Make the rhythm stage interactive, not fully automatic** — let the user
-  supply tempo/meter/pickup, with automatic estimation as default. Full
+- **Make the rhythm stage user-overridable, not fully automatic** — let the
+  user supply tempo/meter/pickup (CLI flags, e.g. `--tempo`, `--meter`),
+  with automatic estimation as default. Full
   automation will lose to rubato; a manual override costs little and is
   the difference between unusable and useful for a personal tool.
 - **Always emit raw unquantized MIDI alongside the MusicXML** — when
@@ -212,18 +211,25 @@ Design calls favored given the repertoire:
   model actually heard so the notation stage can be re-run with different
   parameters without re-running inference.
 
-## Open questions (unresolved as of this note)
+## Resolved questions
 
-1. **Is hosted deployment (Vercel + backend host) a hard requirement, or
-   just the default assumption from the original brainstorm?** This
-   determines whether `web/` is real early work or a later footnote. The
-   cluster doesn't answer this — it can't host a persistent service anyway.
-2. **Willing to accept upload-only input** (skip YouTube URL fetching
-   server-side) to dodge the datacenter-IP blocking problem? Could still do
-   the URL→audio download client-side/locally and only send audio to the
-   backend.
+- **Hosted deployment?** No. The project is a local CLI, so there's no
+  `web/` layer.
+- **Upload-only input to avoid datacenter-IP blocking?** Not needed. yt-dlp
+  runs on the user's own connection, so URL input stays.
+- **What's the tool for, now that duets are out?** Mainly **solo piano
+  YouTube covers with no published score**. Consequences:
+  - Real use has no ground truth, so evaluation relies on proxies:
+    published classical scores, purchased or hand-made scores for a few
+    covers, and synthetic audio rendered from pop-piano MIDI datasets.
+  - Recording conditions (home/digital pianos, phone mics, reverb,
+    compression) are the main transcription risk, so test models on
+    YouTube-like audio, not just MAESTRO, and include Aria-AMT.
+  - Pop/film/anime cover textures (melody in the right hand, accompaniment
+    in the left, steadier tempo) are usually easier to notate than Liszt;
+    Liebesträume becomes a stress test rather than the main target.
 
 Suggested next step (not yet started): build `core/` as a standalone
 library + CLI, validate the pipeline on MAESTRO ground-truth MIDI first
 (zero-inference baseline for the notation stage), then layer in real
-transcription, then decide on `web/` once the above questions are answered.
+transcription.

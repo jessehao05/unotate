@@ -3,6 +3,14 @@
 
 > **Purpose:** Preserve the feasibility analysis of this project so it can be revisited later.
 
+> **Status (`solo/local` branch):** scope is now a **local CLI**
+> (`unotate transcribe <url-or-file> -o out.musicxml`), **solo piano only**,
+> **MusicXML output** (see [overview.md](../overview.md)). The web frontend,
+> deployment and piano-duet material is removed or marked out of scope
+> below; earlier versions are in git history. For current model choices,
+> see [models.md](models.md) — the models named in §3 and §14 are older
+> baselines.
+
 ---
 
 ## 1. Project Overview
@@ -16,8 +24,9 @@ The current scope is intentionally narrow:
 - No background instrumentation
 - No piano + another instrument
 - Input: YouTube URL or MP3
-- Target examples: solo piano pieces such as Liszt's *Liebestraum No. 3*, Chopin nocturnes, Beethoven sonatas, and four-hand piano arrangements
-- For piano duets, there is no expectation that the system will determine which performer/hand played each note.
+- Target examples: solo piano pieces such as Liszt's *Liebestraum No. 3*, Chopin nocturnes, Beethoven sonatas
+- Runs locally as a single CLI command; no web app or hosting
+- Output: MusicXML (plus MIDI)
 - Human cleanup/editing is explicitly part of the workflow.
 
 ## 2. Overall Feasibility
@@ -35,13 +44,11 @@ The important distinction is:
 | MP3 → piano notes | Very feasible | Medium |
 | YouTube URL → audio | Feasible | Low–Medium |
 | Polyphonic piano transcription | Feasible | Medium–High |
-| Piano duet transcription | Feasible with limitations | High |
 | Notes → MIDI | Very feasible | Low |
 | MIDI → MusicXML | Very feasible | Low–Medium |
 | MusicXML → MuseScore | Very feasible | Low |
 | Automatically produce beautiful sheet music | Possible, but difficult | High |
-| Free public deployment | Technically possible, but awkward | High |
-| Fully local application | Very feasible | Low |
+| Fully local CLI | Very feasible | Low |
 
 Overall: approximately **8/10 feasible** for the stated personal-use goal.
 
@@ -272,42 +279,17 @@ The narrower input scope is therefore a significant advantage.
 
 ## 9. Piano Duets
 
-Four-hand piano is possible, but there is an important limitation.
-
-A recording gives the model a combined audio signal:
-
-```text
-Person A             Person B
-   ↓                    ↓
-      └──── piano ──────┘
-               ↓
-        single audio signal
-```
-
-The transcription model does not inherently know which performer or hand played every note.
-
-However, that does not need to be solved for the MVP.
-
-The system could produce a combined piano transcription and let the user reorganize it afterward.
+Out of scope on this branch (solo piano only).
 
 ---
 
-## 10. Deployment: Local First
+## 10. Deployment: Local Only
 
-The original plan considers:
-- React/Vite or Next.js frontend
-- TypeScript
-- FastAPI backend
-- Render
-- Vercel
-- Free deployment
-- Easy public URL
-
-That architecture is possible, but it should **not** be the starting point.
+The original plan considered a React/Vite or Next.js frontend, a FastAPI backend, and free hosting on Render + Vercel. **That has been dropped:** the project is a local CLI with no deployment.
 
 For personal use, local execution is attractive because transcription can be computationally expensive.
 
-The local architecture could initially be:
+The local architecture is:
 
 ```text
 Your computer
@@ -331,13 +313,9 @@ Local execution avoids:
 - Temporary file storage
 - Free-tier limitations
 
-The public/free deployment requirement should therefore be treated as a **later feature**, not an MVP requirement.
-
 ---
 
 ## 11. Recommended Initial Architecture
-
-For the first version, skip the full web stack.
 
 Start with:
 
@@ -364,7 +342,11 @@ The program would:
 5. Optionally convert MIDI to MusicXML
 6. Save the output files
 
-Only after that works should the web application be added.
+This grows into the final CLI:
+
+```bash
+unotate transcribe <url-or-file> -o out.musicxml
+```
 
 ---
 
@@ -394,7 +376,7 @@ Output:
 song.mid
 ```
 
-No YouTube, React, FastAPI, deployment, or MusicXML yet.
+No YouTube or MusicXML yet.
 
 If this works on real piano pieces, the hardest core assumption has been validated.
 
@@ -436,21 +418,11 @@ MIDI
 MusicXML
 ```
 
-### MVP 4 — Web Frontend
+### MVP 4 — Single CLI command
 
-Add:
+Wrap the pipeline as `unotate transcribe <url-or-file> -o out.musicxml`, writing the MIDI alongside the MusicXML.
 
-```text
-React/Vite
-     ↓
-FastAPI
-     ↓
-Python transcription pipeline
-```
-
-### MVP 5 — Deployment
-
-Only after the local application works should free/public hosting be investigated.
+(The earlier web frontend and deployment MVPs are dropped.)
 
 ---
 
@@ -519,19 +491,9 @@ This gives the project a meaningful engineering/research component without requi
 
 ---
 
-## 15. Potential Future UI Feature: Piano Roll
+## 15. Potential Future Feature: Run Summary
 
-A useful future feature would be a piano-roll visualization:
-
-```text
-C6 ────────
-B5      ───────
-A5 ─────────────
-G5       ────────
-...
-```
-
-A future UI could show:
+With no UI, the CLI can print a summary when it finishes:
 
 ```text
 Transcription complete
@@ -540,13 +502,11 @@ Duration:       4:37
 Detected notes: 2,841
 Estimated BPM:  72
 
-[View Piano Roll]
-
-[Download MIDI]
-[Download MusicXML]
+Wrote out.mid
+Wrote out.musicxml
 ```
 
-This would let the user inspect the transcription before worrying about notation.
+To inspect the transcription before worrying about notation, open the MIDI in MuseScore or any DAW's piano roll rather than building a viewer.
 
 ---
 
@@ -566,83 +526,49 @@ The current project scope is much closer to the first goal because it explicitly
 
 ## 17. Recommended Technical Stack
 
-### Initial prototype
-
 ```text
-Python
-Existing AMT model
+Python (CLI)
+Existing AMT model (see models.md)
 MIDI library
 MusicXML/music-notation library
+yt-dlp + ffmpeg for URL input
 MuseScore for manual cleanup
 ```
 
-### Later application
-
-```text
-Frontend:
-TypeScript
-React + Vite
-
-Backend:
-Python
-FastAPI
-
-Transcription:
-Basic Pitch / Onsets & Frames / MT3
-
-Output:
-MIDI
-MusicXML
-
-Development:
-Local GPU first
-
-Deployment:
-Investigate after local version works
-```
-
-There is no strong reason to choose Next.js over React/Vite at the beginning. Since the application is primarily a client UI over a Python backend, React + Vite is a straightforward fit.
+No frontend or backend framework is needed.
 
 ---
 
 ## 18. Suggested Project Structure
 
 ```text
-piano-transcriber/
+unotate/
 │
-├── backend/
-│   ├── api/
+├── unotate/
 │   ├── audio/
 │   ├── transcription/
 │   ├── midi/
 │   ├── musicxml/
-│   └── main.py
-│
-├── frontend/
-│   └── ...
+│   └── cli.py
 │
 ├── tests/
 │
 ├── examples/
 │
-├── README.md
-│
-└── run.py
+└── README.md
 ```
 
-A single launcher could eventually handle the whole application:
+The whole application runs from one command:
 
 ```bash
-python run.py
+unotate transcribe <url-or-file> -o out.musicxml
 ```
-
-Docker Compose is another possible later solution.
 
 ---
 
 ## 19. Recommended First Experiments
 
-Before building the frontend, test transcription quality on a small benchmark.
+Before building the full pipeline, test transcription quality on a small benchmark.
 
 ### Test set
 
@@ -653,7 +579,6 @@ Before building the frontend, test transcription quality on a small benchmark.
 5. Dense/chord-heavy piece
 6. Very soft piece
 7. Fast piece
-8. Four-hand arrangement
 
 For each:
 
@@ -682,7 +607,7 @@ Track:
 - Notation problems
 - Runtime
 
-This will tell you much more about project feasibility than building the web UI first.
+This will tell you much more about project feasibility than building the full CLI first.
 
 ---
 
@@ -705,9 +630,7 @@ The most sensible strategy is:
 3. Test in MuseScore
 4. Add YouTube input
 5. Improve post-processing
-6. Build FastAPI backend
-7. Build React frontend
-8. Consider deployment
+6. Wrap it all in one CLI command
 ```
 
 The central design philosophy should be:
