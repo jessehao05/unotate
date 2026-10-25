@@ -45,20 +45,23 @@ re-running inference.
 - [x] Add `data/` to `.gitignore` (audio is copyrighted, stays local)
 
 ### 1. Starter test set
-- [ ] Download 5 clips from [data.md](research/data.md) to `data/raw/`:
+- [x] Download 6 clips from [data.md](research/data.md) to `data/raw/`:
   - Hampstead, TutorialsByHugo (ground truth)
   - Tong Hua, djjedforce (ground truth)
   - Hampstead, Sing2Piano (same song, different arranger/piano)
   - call of silence, gentle_motif (heavy reverb/pedal)
-  - one Instagram reel (checks Instagram download works)
+  - if im with you, hanaisdao_
+  - love, goanklm_
 - [ ] Note what form the ground truth is in (PDF / MusicXML / MIDI)
 - command: `yt-dlp -x --audio-format mp3 --audio-quality 0 -o "data/raw/%(title)s.%(ext)s" "<youtube-url>"`
 
 
 ### 2. Model bake-off
 - [ ] Run Transkun, Kong, then Aria-AMT on all 5 clips on the primary machine → `data/out/<model>/<clip>.mid`
+  - transkun: `uv run transkun data/raw/song_a.mp3 data/out/transkun/song_a.mid --device cuda`
+  - kong: `uv run python scripts/kong.py song_a.mp3`
 - [ ] Note which models also run on the M1 (Aria-AMT may not fit in 8 GB)
-- [ ] Listen to / inspect each MIDI against the video
+- [x] Listen to / inspect each MIDI against the video
 - [ ] Record findings and pick a default model in `docs/research/bakeoff.md`
 
 ### 3. Evaluation setup
