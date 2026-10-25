@@ -8,7 +8,17 @@ Background: [overview.md](overview.md),
 [feasibility_claude.md](research/feasibility_claude.md),
 [models.md](research/models.md), [data.md](research/data.md).
 
-Machine: Apple M1, 8 GB RAM, no CUDA. Inference runs on CPU (MPS later).
+## Machines
+
+**Primary**: Lenovo laptop (82Y5), Windows 11 Home
+- CPU: AMD Ryzen 7 7840HS (8 cores / 16 threads)
+- RAM: 32 GB
+- GPU: NVIDIA RTX 4060 Laptop, 8 GB VRAM (CUDA); plus integrated Radeon 780M
+- Disk: 1 TB SSD
+- Inference runs on CUDA; CPU fallback.
+
+**Secondary (fallback)**: Apple M1, 8 GB RAM, no CUDA. Inference runs on CPU
+(MPS later). Keep the pipeline runnable here, but larger models may not fit.
 
 ## Pipeline
 
@@ -28,8 +38,10 @@ re-running inference.
 ## Steps
 
 ### 0. Environment
-- [ ] `brew install uv ffmpeg`
+- [x] Primary: uv and ffmpeg installed
+- [ ] Secondary (M1): `brew install uv ffmpeg`
 - [ ] `uv init --package --python 3.11`, `uv add yt-dlp`
+- [ ] Primary: install CUDA build of PyTorch; check `torch.cuda.is_available()`
 - [ ] Add `data/` to `.gitignore` (audio is copyrighted, stays local)
 
 ### 1. Starter test set
@@ -42,7 +54,8 @@ re-running inference.
 - [ ] Note what form the ground truth is in (PDF / MusicXML / MIDI)
 
 ### 2. Model bake-off
-- [ ] Run Transkun, Kong, then Aria-AMT (may not fit in 8 GB) on all 5 clips → `data/out/<model>/<clip>.mid`
+- [ ] Run Transkun, Kong, then Aria-AMT on all 5 clips on the primary machine → `data/out/<model>/<clip>.mid`
+- [ ] Note which models also run on the M1 (Aria-AMT may not fit in 8 GB)
 - [ ] Listen to / inspect each MIDI against the video
 - [ ] Record findings and pick a default model in `docs/research/bakeoff.md`
 
