@@ -40,9 +40,9 @@ re-running inference.
 ### 0. Environment
 - [x] Primary: uv and ffmpeg installed
 - [ ] Secondary (M1): `brew install uv ffmpeg`
-- [ ] `uv init --package --python 3.11`, `uv add yt-dlp`
-- [ ] Primary: install CUDA build of PyTorch; check `torch.cuda.is_available()`
-- [ ] Add `data/` to `.gitignore` (audio is copyrighted, stays local)
+- [x] `uv init --package --python 3.11`, `uv add yt-dlp`
+- [x] Primary: install CUDA build of PyTorch; check `torch.cuda.is_available()`
+- [x] Add `data/` to `.gitignore` (audio is copyrighted, stays local)
 
 ### 1. Starter test set
 - [ ] Download 5 clips from [data.md](research/data.md) to `data/raw/`:
@@ -52,6 +52,8 @@ re-running inference.
   - call of silence, gentle_motif (heavy reverb/pedal)
   - one Instagram reel (checks Instagram download works)
 - [ ] Note what form the ground truth is in (PDF / MusicXML / MIDI)
+- command: `yt-dlp -x --audio-format mp3 --audio-quality 0 -o "data/raw/%(title)s.%(ext)s" "<youtube-url>"`
+
 
 ### 2. Model bake-off
 - [ ] Run Transkun, Kong, then Aria-AMT on all 5 clips on the primary machine → `data/out/<model>/<clip>.mid`
