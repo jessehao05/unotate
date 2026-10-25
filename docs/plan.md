@@ -61,7 +61,7 @@ re-running inference.
   - transkun: `uv run transkun data/raw/song_a.mp3 data/out/transkun/song_a.mid --device cuda`
   - kong: `uv run python scripts/kong.py song_a.mp3`
 - [ ] Note which models also run on the M1 (Aria-AMT may not fit in 8 GB)
-- [x] Listen to / inspect each MIDI against the video
+- [ ] Listen to / inspect each MIDI against the video
 - [ ] Record findings and pick a default model in `docs/research/bakeoff.md`
 
 ### 3. Evaluation setup
